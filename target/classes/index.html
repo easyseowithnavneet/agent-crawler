@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SEO Crawler</title>
+</head>
+<body style="font-family: Arial; text-align:center; margin-top:50px;">
+
+<h1>🚀 SEO Crawler Tool</h1>
+
+<input type="text" id="url" placeholder="Enter website URL" size="40"/>
+<br><br>
+
+<button onclick="startCrawl()">Start Crawl</button>
+
+<h2 id="status">Status: Idle</h2>
+
+<br>
+<button onclick="downloadCSV()">⬇ Download Report</button>
+
+<script>
+
+let interval;
+
+function startCrawl() {
+    let url = document.getElementById("url").value;
+
+    if (!url) {
+        alert("Enter URL first");
+        return;
+    }
+
+    fetch("/crawl?url=" + url)
+        .then(res => res.text())
+        .then(data => {
+            document.getElementById("status").innerText = data;
+
+            if (interval) clearInterval(interval);
+
+            interval = setInterval(() => {
+                fetch("/status")
+                    .then(res => res.text())
+                    .then(data => {
+                        document.getElementById("status").innerText = data;
+                    });
+            }, 2000);
+        });
+}
+
+function downloadCSV() {
+    window.open("/download");
+}
+
+</script>
+
+
+</body>
+</html>
