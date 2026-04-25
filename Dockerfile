@@ -1,13 +1,11 @@
-FROM openjdk:17-jdk-slim
+FROM openjdk:17
 
 WORKDIR /app
 
 COPY . .
 
-RUN apt-get update && apt-get install -y maven
+RUN chmod +x mvnw
 
-RUN mvn clean package -DskipTests
-
-EXPOSE 10000
+RUN ./mvnw clean package -DskipTests
 
 CMD ["java", "-jar", "target/*.jar"]
