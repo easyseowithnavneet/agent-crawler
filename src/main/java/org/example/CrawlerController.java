@@ -7,10 +7,10 @@ import java.io.PrintWriter;
 @CrossOrigin
 public class CrawlerController {
 
-    @GetMapping("/")
+    /*@GetMapping("/")
     public String home() {
         return "SEO Crawler is running 🚀";
-    }
+    }*/
 
     @GetMapping("/crawl")
     public String crawl(@RequestParam String url,
