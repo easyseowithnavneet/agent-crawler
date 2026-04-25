@@ -38,10 +38,10 @@ function startCrawl() {
 
             interval = setInterval(() => {
                 fetch("/status")
-                .then(res => res.json())
-                .then(data => {
-                document.getElementById("status").innerText = data.join("\n");
-                });
+                    .then(res => res.text())
+                    .then(data => {
+                        document.getElementById("status").innerText = data;
+                    });
             }, 2000);
         });
 }

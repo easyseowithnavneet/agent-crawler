@@ -7,44 +7,49 @@ import org.jsoup.select.Elements;
 
 import java.io.PrintWriter;
 import java.net.URI;
-import java.net.URL;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.TimeUnit;
-
 
 public class Main {
 
+    // ===== THREAD-SAFE STRUCTURES =====
     static BlockingQueue<String> queue = new LinkedBlockingQueue<>();
-    static AtomicInteger activeTasks = new AtomicInteger(0);
     static Set<String> visited = ConcurrentHashMap.newKeySet();
 
-    static int maxPages = 100;
-    static int THREADS = 5;
+    static AtomicInteger activeTasks = new AtomicInteger(0);
+    static AtomicInteger pagesCrawled = new AtomicInteger(0);
+
+    static List<String> logs = Collections.synchronizedList(new ArrayList<>());
 
     static ExecutorService executor;
 
-    static PrintWriter writer;
+    static int maxPages = 100;
+    static int THREADS = 5;
     static String domain;
+    static PrintWriter writer;
 
-    public static AtomicInteger pagesCrawled = new AtomicInteger(0);
+    static volatile boolean isRunning = false;
 
     // ===== START CRAWLER =====
     public static void startCrawler(String startUrl, int max, PrintWriter w) {
-
         try {
-            // ✅ FIX deprecated URL
-            domain = new URI(startUrl).toURL().getHost();
+            isRunning = true;
+
+            domain = new URI(startUrl).getHost();
 
             writer = w;
             maxPages = max;
 
+            // RESET STATE
             queue.clear();
             visited.clear();
+            logs.clear();
             activeTasks.set(0);
             pagesCrawled.set(0);
-            queue.add(startUrl);
+
+            // ✅ IMPORTANT: ADD START URL
+            queue.offer(startUrl);
 
             executor = Executors.newFixedThreadPool(THREADS);
 
@@ -52,9 +57,10 @@ public class Main {
                 executor.submit(Main::worker);
             }
 
-            // ✅ BETTER WAIT (no busy loop)
             executor.shutdown();
             executor.awaitTermination(10, TimeUnit.MINUTES);
+
+            isRunning = false;
 
             writer.flush();
             writer.close();
@@ -63,11 +69,12 @@ public class Main {
             log("Total pages: " + pagesCrawled.get());
 
         } catch (Exception e) {
+            log("ERROR: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    // ===== WORKER =====
+    // ===== WORKER THREAD =====
     public static void worker() {
 
         while (true) {
@@ -76,25 +83,30 @@ public class Main {
             try {
                 url = queue.poll(3, TimeUnit.SECONDS);
 
+                // Stop condition
                 if (url == null) {
                     if (activeTasks.get() == 0) return;
                     else continue;
                 }
 
-                synchronized (visited) {
-                    if (visited.size() >= maxPages) return;
-                    if (!visited.add(url)) continue;
-                }
+                // LIMIT + DUPLICATE CHECK
+                if (visited.size() >= maxPages) return;
+                if (!visited.add(url)) continue;
 
                 activeTasks.incrementAndGet();
 
                 log("Crawling: " + url);
 
+                // ===== FETCH PAGE =====
                 Document doc = Jsoup.connect(url)
                         .userAgent("Mozilla/5.0")
-                        .timeout(10000)
+                        .timeout(15000)
+                        .ignoreHttpErrors(true)
+                        .ignoreContentType(true)
+                        .followRedirects(true)
                         .get();
 
+                // ===== SEO METRICS =====
                 String title = doc.title();
                 int titleLen = title.length();
 
@@ -115,6 +127,7 @@ public class Main {
 
                 int schemaCount = doc.select("script[type=application/ld+json]").size();
 
+                // ===== SEO SCORE =====
                 int score = 0;
                 if (titleLen >= 50 && titleLen <= 60) score += 20;
                 if (descLen >= 140 && descLen <= 160) score += 20;
@@ -124,20 +137,24 @@ public class Main {
                 if (doc.selectFirst("link[rel=canonical]") != null) score += 10;
                 if (doc.select("meta[property^=og:]").size() > 0) score += 10;
 
+                // ===== WRITE CSV =====
                 synchronized (writer) {
-                    writer.println(url + "," + titleLen + "," + descLen + "," + h1Count + "," +
-                            totalImages + "," + missingAlt + "," + schemaCount + "," + score);
+                    writer.println(url + "," + titleLen + "," + descLen + "," +
+                            h1Count + "," + totalImages + "," + missingAlt + "," +
+                            schemaCount + "," + score);
                 }
 
                 int count = pagesCrawled.incrementAndGet();
                 log("📄 Pages crawled: " + count);
 
+                // ===== EXTRACT LINKS =====
                 Elements links = doc.select("a[href]");
+
                 for (Element link : links) {
                     String nextUrl = normalizeUrl(link.absUrl("href"));
 
                     if (isValidUrl(nextUrl) &&
-                            nextUrl.startsWith("https://" + domain) &&
+                            isSameDomain(nextUrl) &&
                             visited.size() < maxPages) {
 
                         queue.offer(nextUrl);
@@ -154,16 +171,30 @@ public class Main {
         }
     }
 
+    // ===== LOGGING =====
     public static void log(String msg) {
+        logs.add(msg);
         System.out.println(msg);
     }
 
-    public static String normalizeUrl(String url) {
-        int hash = url.indexOf("#");
-        if (hash != -1) url = url.substring(0, hash);
+    public static List<String> getLogs() {
+        return logs;
+    }
 
-        int q = url.indexOf("?");
-        if (q != -1) url = url.substring(0, q);
+    public static boolean isRunning() {
+        return isRunning;
+    }
+
+    // ===== URL HELPERS =====
+    public static String normalizeUrl(String url) {
+        try {
+            int hash = url.indexOf("#");
+            if (hash != -1) url = url.substring(0, hash);
+
+            int q = url.indexOf("?");
+            if (q != -1) url = url.substring(0, q);
+
+        } catch (Exception ignored) {}
 
         return url;
     }
@@ -174,5 +205,14 @@ public class Main {
                 !url.contains("twitter") &&
                 !url.contains("linkedin") &&
                 !url.contains("mailto:");
+    }
+
+    public static boolean isSameDomain(String url) {
+        try {
+            String host = new URI(url).getHost();
+            return host != null && host.contains(domain);
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

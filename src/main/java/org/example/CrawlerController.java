@@ -1,77 +1,66 @@
 package org.example;
 
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+
+import java.io.File;
+import java.io.FileWriter;
 import java.io.PrintWriter;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @CrossOrigin
 public class CrawlerController {
 
-    /*@GetMapping("/")
-    public String home() {
-        return "SEO Crawler is running 🚀";
-    }*/
+    private static final String FILE_NAME = "seo_report.csv";
 
-    @GetMapping("/crawl")
-    public String crawl(@RequestParam String url,
-                        @RequestParam(defaultValue = "50") int max) {
+    // ===== START CRAWL =====
+    @PostMapping("/start")
+    public ResponseEntity<String> startCrawl(
+            @RequestParam String url,
+            @RequestParam(defaultValue = "50") int maxPages) {
+
+        if (Main.isRunning()) {
+            return ResponseEntity.ok("Crawler already running...");
+        }
 
         try {
-            PrintWriter writer = new PrintWriter("seo_report.csv");
+            PrintWriter writer = new PrintWriter(new FileWriter(FILE_NAME));
+            writer.println("URL,TitleLength,DescriptionLength,H1Count,TotalImages,MissingAlt,SchemaCount,SEOScore");
 
-            Main.startCrawler(url, max, writer);
+            // Run crawler in new thread (non-blocking)
+            new Thread(() -> Main.startCrawler(url, maxPages, writer)).start();
 
-            return "✅ Crawl completed! CSV generated.";
+            return ResponseEntity.ok("Crawl started!");
+
         } catch (Exception e) {
-            return "❌ Error: " + e.getMessage();
+            return ResponseEntity.internalServerError().body("Error starting crawl");
         }
     }
-}
 
-/*package org.example;
-
-import org.springframework.web.bind.annotation.*;
-
-import java.io.PrintWriter;
-import java.util.concurrent.atomic.AtomicInteger;
-import jakarta.servlet.http.HttpServletResponse;
-import java.io.File;
-
-
-@RestController
- class CrawlController {
-    @GetMapping("/download")
-    public void download(HttpServletResponse response) throws Exception {
-
-        File file = new File("seo_report.csv");
-
-        response.setContentType("text/csv");
-        response.setHeader("Content-Disposition", "attachment; filename=seo_report.csv");
-
-        java.nio.file.Files.copy(file.toPath(), response.getOutputStream());
-        response.getOutputStream().flush();
-    }
-
-    @GetMapping("/crawl")
-    public String startCrawl(@RequestParam String url) {
-
-        new Thread(() -> {
-            try {
-                PrintWriter writer = new PrintWriter("seo_report.csv");
-                writer.println("URL,Title Length,Meta Desc Length,H1 Count,Images,Missing Alt,Schema Count,SEO Score");
-
-                Main.startCrawler(url, 100, writer);
-
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }).start();
-
-        return "✅ Crawling started for: " + url;
-    }
-
+    // ===== STATUS API =====
     @GetMapping("/status")
-    public String status() {
-        return "📄 Pages crawled: " + Main.pagesCrawled.get();
+    public Map<String, Object> getStatus() {
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("running", Main.isRunning());
+        response.put("pagesCrawled", Main.pagesCrawled.get());
+        response.put("logs", Main.getLogs());
+
+        return response;
     }
-}*/
+
+    // ===== DOWNLOAD CSV =====
+    @GetMapping("/download")
+    public ResponseEntity<File> downloadCSV() {
+
+        File file = new File(FILE_NAME);
+
+        if (!file.exists()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(file);
+    }
+}
