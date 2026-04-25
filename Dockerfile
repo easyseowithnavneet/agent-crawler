@@ -9,4 +9,4 @@ RUN mvn clean package -DskipTests
 EXPOSE 10000
 
 # Run app
-CMD ["java", "-jar", "target/AgentCrawler-1.0-SNAPSHOT.jar"]
+CMD ["java", "-jar", "target/agent-crawler-1.0-SNAPSHOT.jar"]
