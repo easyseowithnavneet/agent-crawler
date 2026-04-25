@@ -30,9 +30,11 @@ public class Main {
     static PrintWriter writer;
 
     static volatile boolean isRunning = false;
+    private static volatile boolean running = false;
+
 
     // ===== START CRAWLER =====
-    public static void startCrawler(String startUrl, int max, PrintWriter w) {
+    /*public static void startCrawler(String startUrl, int max, PrintWriter w) {
         try {
             isRunning = true;
 
@@ -72,7 +74,48 @@ public class Main {
             log("ERROR: " + e.getMessage());
             e.printStackTrace();
         }
+    }*/
+    public static void startCrawler(String startUrl, int max, PrintWriter w) {
+
+        try {
+            running = true;   // ✅ START
+
+            domain = new URI(startUrl).toURL().getHost();
+
+            writer = w;
+            maxPages = max;
+
+            queue.clear();
+            visited.clear();
+            activeTasks.set(0);
+            pagesCrawled.set(0);
+            logs.clear();
+
+            queue.add(startUrl);  // ✅ CRITICAL FIX
+
+            executor = Executors.newFixedThreadPool(THREADS);
+
+            for (int i = 0; i < THREADS; i++) {
+                executor.submit(Main::worker);
+            }
+
+            executor.shutdown();
+            executor.awaitTermination(10, TimeUnit.MINUTES);
+
+            writer.flush();
+            writer.close();
+
+            log("✅ Crawl Completed!");
+            log("Total pages: " + pagesCrawled.get());
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            running = false;   // ✅ END
+        }
     }
+    
+
 
     // ===== WORKER THREAD =====
     public static void worker() {
