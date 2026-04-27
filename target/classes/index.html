@@ -15,12 +15,46 @@
 
 <button onclick="startCrawl()">Start Crawl</button>
 
-<h2 id="status">Status: Idle</h2>
+<!--<h2 id="status">Status: Idle</h2>-->
+<pre id="output"></pre>
+<div id="status"></div>
 
 <br>
 <button onclick="downloadCSV()">⬇ Download Report</button>
-<pre id="output"></pre>
+
 <script>
+function startCrawl() {
+    const url = document.getElementById("url").value;
+    const max = document.getElementById("max")?.value || 50;
+
+    if (!url) {
+        alert("Enter URL first");
+        return;
+    }
+
+    fetch(`/start?url=${encodeURIComponent(url)}&max=${max}`)
+        .then(res => res.text())
+        .then(data => {
+            document.getElementById("status").innerText = data;
+        });
+}
+
+// Auto refresh status every 2 sec
+setInterval(() => {
+    fetch('/status')
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById("output").innerText =
+                JSON.stringify(data, null, 2);
+        });
+}, 2000);
+
+function downloadCSV() {
+    window.open("/download");
+}
+</script>
+
+<!--<script>
 
 let interval;
 
@@ -66,7 +100,7 @@ function downloadCSV() {
     window.open("/download");
 }
 
-</script>
+</script>-->
 
 
 <!--<script>
