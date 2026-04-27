@@ -12,7 +12,8 @@ public class CrawlerController {
 
     // START API
     @GetMapping("/start")
-    public String start(@RequestParam String url, @RequestParam int max) {
+    public String start(@RequestParam String url, @RequestParam(defaultValue = "50") int max) {
+//    public String start(@RequestParam String url, @RequestParam int max) {
 
         new Thread(() -> {
             try {

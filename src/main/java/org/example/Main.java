@@ -14,9 +14,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class Main {
 
     static BlockingQueue<String> queue = new LinkedBlockingQueue<>();
+    static AtomicInteger activeTasks = new AtomicInteger(0);
     static Set<String> visited = ConcurrentHashMap.newKeySet();
 
     public static List<String> logs = Collections.synchronizedList(new ArrayList<>());
+
+    public static volatile boolean running = false;
+
 
     static int maxPages = 100;
     static int THREADS = 5;
@@ -24,9 +28,7 @@ public class Main {
     static ExecutorService executor;
     static PrintWriter writer;
     static String domain;
-
     public static AtomicInteger pagesCrawled = new AtomicInteger(0);
-    public static volatile boolean running = false;
 
     // ===== START CRAWLER =====
     public static void startCrawler(String startUrl, int max, PrintWriter w) {
@@ -148,5 +150,8 @@ public class Main {
 
     public static boolean isRunning() {
         return running;
+    }
+    public static int getPagesCrawled() {
+        return pagesCrawled.get();
     }
 }
