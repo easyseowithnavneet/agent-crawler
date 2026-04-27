@@ -5,6 +5,11 @@ import org.springframework.web.bind.annotation.*;
 import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.Map;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.*;
+import java.io.*;
+
 
 @RestController
 @CrossOrigin
@@ -26,6 +31,23 @@ public class CrawlerController {
 
         return "Crawler Started 🚀";
     }
+    @GetMapping("/download")
+    public ResponseEntity<Resource> downloadFile() throws Exception {
+
+        File file = new File("seo_report.csv");
+
+        if (!file.exists()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        InputStreamResource resource = new InputStreamResource(new FileInputStream(file));
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=seo_report.csv")
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .body(resource);
+    }
+
 
     // STATUS API
     @GetMapping("/status")
