@@ -126,12 +126,40 @@ public class Main {
                 for (Element link : links) {
                     String next = link.absUrl("href");
 
+// ❌ Skip empty
+                    if (next.isEmpty()) continue;
+
+// ❌ Remove fragment (#...)
+                    int hashIndex = next.indexOf("#");
+                    if (hashIndex != -1) {
+                        next = next.substring(0, hashIndex);
+                    }
+
+// ❌ Skip non-http
+                    if (!next.startsWith("http")) continue;
+
+// ❌ Stay inside same domain
+                    if (!next.contains(domain)) continue;
+
+// ❌ Skip login, account, cart, etc.
+                    if (next.matches(".*(login|signup|account|cart|checkout).*")) continue;
+
+// ❌ Skip duplicates again after cleanup
+                    if (visited.contains(next)) continue;
+
+// ✅ Add to queue
+                    if (visited.size() < maxPages) {
+                        queue.offer(next);
+                    }
+
+                    /*String next = link.absUrl("href");
+
                     if (next.startsWith("http") &&
                             next.contains(domain) &&
                             visited.size() < maxPages) {
 
                         queue.offer(next);
-                    }
+                    }*/
                 }
 
             } catch (Exception e) {
