@@ -38,6 +38,7 @@ public class Main {
 
             domain = new URI(startUrl).toURL().getHost();
             writer = w;
+            writer.println("URL,Title Length,Meta Description Length,H1 Count,Total Images,Missing Alt,SEO Score");
             maxPages = max;
 
             queue.clear();
